@@ -1,81 +1,59 @@
-
 local NXFS = require "nixio.fs"
 local SYS  = require "luci.sys"
 local HTTP = require "luci.http"
 local DISP = require "luci.dispatcher"
 local UTIL = require "luci.util"
+local uci = require("luci.model.uci").cursor()
+local fs = require "luci.clash"
+local clash = "clash"
 
 
-m = Map("clash", translate("Clash Client"))
-m:section(SimpleSection).template  = "clash/status"
+m = Map("clash")
 s = m:section(TypedSection, "clash")
 s.anonymous = true
+m.pageaction = false
 
-
-o = s:option( Flag, "enable")
-o.title = translate("Enable Clash")
-o.default = 0
-o.rmempty = false
-o.description = translate("After clash start running, wait a moment for servers to resolve,enjoy")
-
-
-o = s:option(Value, "proxy_port")
-o.title = translate("* Clash Redir Port")
-o.default = 7892
-o.datatype = "port"
-o.rmempty = false
-o.description = translate("Clash config redir-port")
-
-o = s:option(Value, "cn_port")
-o.title = translate("Dashboard Port")
-o.default = 9090
-o.datatype = "port"
-o.rmempty = false
-o.description = translate("Dashboard hostname is Your router local address. eg, 192.168.1.1")
-
-o = s:option(Value, "dashboard_password")
-o.title = translate("Dashboard Secret")
-o.default = 123456
-o.rmempty = false
-o.description = translate("Dashboard Secret")
-
-o = s:option(Flag, "auto_update", translate("Auto Update"))
-o.rmempty = false
-o.description = translate("Auto Update Server subscription")
-
-
-o = s:option(ListValue, "auto_update_time", translate("Update time (every day)"))
-for t = 0,23 do
-o:value(t, t..":00")
+o = s:option(ListValue, "core", translate("Core"))
+o.default = "clashcore"
+if nixio.fs.access("/etc/clash/clash") then
+o:value("1", translate("Clash"))
 end
-o.default=0
-o.rmempty = false
+if nixio.fs.access("/usr/bin/clash") then
+o:value("2", translate("Clashr"))
+end
+if nixio.fs.access("/etc/clash/clashtun/clash") then
+o:value("3", translate("Clash(cTun)"))
+end
+if nixio.fs.access("/etc/clash/dtun/clash") then
+o:value("4", translate("Clash(dTun)"))
+end
+o.description = translate("Select core, clashr support ssr while clash does not.")
 
-o = s:option(Value, "subscribe_url")
-o.title = translate("Subcription Url")
-o.description = translate("Server Subscription Address")
-o.rmempty = true
+o = s:option(ListValue, "g_rules", translate("Game Rules"))
+o.default = "0"
+o:value("0", translate("Disable"))
+o:value("1", translate("Enable"))
+o.description = translate("Set rules under Setting=>Game Rules, will take effect when client start")
 
-o = s:option(Button,"update")
-o.title = translate("Update Subcription")
-o.inputtitle = translate("Update Configuration")
-o.inputstyle = "reload"
+
+o = s:option(ListValue, "append_rules", translate("Append Customs Rules"))
+o.default = "0"
+o:value("0", translate("Disable"))
+o:value("1", translate("Enable"))
+o.description = translate("Set custom rules under Setting=>Others , will take effect when client start")
+
+o = s:option(Button, "Apply")
+o.title = translate("Save & Apply")
+o.inputtitle = translate("Save & Apply")
+o.inputstyle = "apply"
 o.write = function()
-  os.execute("mv /etc/clash/config.yml /etc/clash/config.bak")
-  SYS.call("bash /usr/share/clash/clash.sh >>/tmp/clash.log 2>&1 &")
-  HTTP.redirect(DISP.build_url("admin", "services", "clash"))
+  m.uci:commit("clash")
 end
 
-
-local apply = luci.http.formvalue("cbi.apply")
-if apply then
-	os.execute("/etc/init.d/clash restart >/dev/null 2>&1 &")
-end
-
-
-
+o = s:option(Button,"action")
+o.title = translate("Operation")
+o.template = "clash/start_stop"
 
 
 return m
-
 
